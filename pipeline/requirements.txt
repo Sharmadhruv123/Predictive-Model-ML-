@@ -1,0 +1,11 @@
+dagster
+dagster-webserver
+dagster-postgres
+pandas
+numpy
+scikit-learn
+psycopg2-binary
+sqlalchemy
+pyarrow
+fastparquet
+great_expectations

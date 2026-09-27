@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mlplatform}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/mlplatform}
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ./ml:/ml
+      - ./data:/data
+    depends_on:
+      - db
+      - mlflow
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+
+  mlflow:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile.mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql://postgres:postgres@db:5432/mlplatform
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow_artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow_artifacts
+    depends_on:
+      - db
+
+  dagster-daemon:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    command: dagster-daemon run
+    environment:
+      - DAGSTER_PG_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/mlplatform}
+    depends_on:
+      - db
+    volumes:
+      - ./data:/data
+
+  dagster-webserver:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    command: dagster-webserver -h 0.0.0.0 -p 3000
+    ports:
+      - "3000:3000"
+    environment:
+      - DAGSTER_PG_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/mlplatform}
+    depends_on:
+      - db
+      - dagster-daemon
+    volumes:
+      - ./data:/data
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:

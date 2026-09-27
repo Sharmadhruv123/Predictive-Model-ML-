@@ -1,0 +1,9 @@
+mlflow
+scikit-learn
+pandas
+numpy
+xgboost
+psycopg2-binary
+shap
+pyarrow
+fastparquet
